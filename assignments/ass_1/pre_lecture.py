@@ -1,12 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy import sparse  
+import scipy
 
 def poisson_matrix(
         Nx: int, 
         Ny: int, 
         h : float,
-)-> sparse:
+): 
     """
     This function initializes the poisson matrix. 
 
@@ -15,13 +15,13 @@ def poisson_matrix(
         Ny      (int): Number of points in the y direction
         h      (float): this si the 
     """
-    N = Nx * Ny
+    Ntot = Nx * Ny
 
-    P = np.full(N,-1)   # point
-    E =  np.full(N-1,1/4)   # east
-    W =  np.full(N-1,1/4)   # west
-    N =  np.full(N-1,1/4)   # north 
-    S =  np.full(N-1,1/4)   # south
+    P = np.full(Ntot,-1)   # point
+    E =  np.full(Ntot-1,1/4)   # east
+    W =  np.full(Ntot-1,1/4)   # west
+    N =  np.full(Ntot-(Nx-1),1/4)   # north 
+    S =  np.full(Ntot-(Nx-1),1/4)   # south
 
     diag = [
         P,
@@ -31,7 +31,7 @@ def poisson_matrix(
         S
     ]
     offsets = [0,1,-1,(Nx-1),-(Nx-1)]       # for N and S points this should maybe be (Nx-2) not sure, this depends on the BC 
-    A = sparse.diag(diag, offsets, shape=(N,N), format = 'csr')
+    A = scipy.sparse.diags(diag, offsets, shape=(Ntot,Ntot), format = 'csr')
     return  A 
 
 
@@ -41,6 +41,6 @@ Nx = 10
 Ny = 5
 h = 1/5
 
-matrix = poisson_matrix(Nx,Ny, h)
+matrix = poisson_matrix(Nx,Ny, h).toarray()
 print(matrix)
 
