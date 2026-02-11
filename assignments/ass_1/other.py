@@ -1,105 +1,80 @@
 import numpy as np
-import scipy.sparse 
+import scipy.sparse
 import matplotlib.pyplot as plt
 
-def poisson_matrix(Nx, Ny):
-    """
-    Creation of the poisson matrix...
-
-    """
-    Ntot = Nx*Ny
-    A = scipy.sparse.lil_matrix((Ntot,Ntot))
-
-    for j in range(Ny):
-        for i in range(Nx):
-
-            idx = i + j*Nx
-
-            # Dirichlet boundaries at inlet 
-            if i==0:
-                A[idx, idx] = 1
-
-            # dirichlet at outlet
-            elif i==Nx-1 and j > 3:
-                A[idx, idx] = 1
-
-            # Dirichlet boundaries at bttom 
-            elif j ==0 and i< 5:
-                A[idx, idx] = 1
-
-            # dirichlet bc at top
-            elif j == Ny-1:
-                A[idx, idx] = 1
-
-            # At the curb
-            elif i>=5 and j<=3:
-                A[idx, idx] = 1
-
-            else: 
-                A[idx, idx] = -4
-                A[idx, idx+1] = 1
-                A[idx, idx -1] = 1
-                A[idx, idx + Nx] = 1
-                A[idx, idx -Nx] = 1
-    
-    return A.tocsr()
-
-def rhs_vector(Nx, Ny, h, Q):
-    """
-    The solution vector
-    ....
-    """
-
-    Ntot = Nx*Ny
-    b = np.zeros(Ntot)
-
-    H = (Ny - 1) * h                # idk what this line does maybe remove
-    for j in range(Ny):
-        for i in range(Nx):
-            idx = i + j*Nx
-            y = j*h
-
-            # bottom wall 
-            if j ==0 and i<5:
-                b[idx] = 0
-            # top wall:
-            elif j ==Ny-1:
-                b[idx] = Q
-            # inlet
-            elif i ==0:
-                b[idx] = Q*y/H
-            # outlet
-            elif i == Nx -1 and j>3:
-                b[idx] = Q*y/H
-
-            # # curb
-            elif i>=5 and j<=3:
-                b[idx] = 2
-            
-            # interior
-            else:
-                b[idx] = 0
-            
-    return b
-
-
-
-# Parameters
+# ---- Parameters ----
 Nx = 10
 Ny = 6
-h = 1/5
+h = 1.0
 Q = 5
 
-# Build system
-A = poisson_matrix(Nx, Ny)
-b = rhs_vector(Nx, Ny, h, Q)
+# ---- Solid mask (curb) ----
+solid = np.zeros((Nx, Ny), dtype=bool)
+for i in range(Nx):
+    for j in range(Ny):
+        if i >= 5 and j <= 3:
+            solid[i,j] = True
 
-# Solve
-psi = scipy.sparse.linalg.spsolve(A.tocsr(), b)
-psi_grid = psi.reshape((Ny, Nx))
+# ---- Build Poisson matrix ----
+def poisson_matrix(Nx, Ny, solid):
+    Ntot = Nx*Ny
+    A = scipy.sparse.lil_matrix((Ntot,Ntot))
+    
+    for i in range(Nx):
+        for j in range(Ny):
+            idx = i + j*Nx
+            
+            # Solid
+            if solid[i,j]:
+                A[idx, idx] = 1
+                continue
+            
+            # Boundaries
+            if i == 0:           # inlet
+                A[idx, idx] = 1
+            elif i == Nx-1:      # outlet (Neumann will be applied later in b)
+                A[idx, idx] = 1
+            elif j == 0:         # bottom wall
+                A[idx, idx] = 1
+            elif j == Ny-1:      # top wall
+                A[idx, idx] = 1
+            else:                # interior
+                A[idx, idx] = -4
+                A[idx, idx+1] = 1
+                A[idx, idx-1] = 1
+                A[idx, idx+Nx] = 1
+                A[idx, idx-Nx] = 1
+    return A.tocsr()
 
-print(psi_grid)
+# ---- RHS vector ----
+def rhs_vector(Nx, Ny, h, Q, solid):
+    Ntot = Nx*Ny
+    b = np.zeros(Ntot)
+    
+    for i in range(Nx):
+        for j in range(Ny):
+            idx = i + j*Nx
+            y = j*h
+            
+            if solid[i,j]:
+                b[idx] = 0
+            elif i == 0:           # inlet
+                b[idx] = Q * y / (h*(Ny-1))
+            elif i == Nx-1:        # outlet (Neumann)
+                b[idx] = 0
+            elif j == 0:           # bottom
+                b[idx] = 0
+            elif j == Ny-1:        # top
+                b[idx] = Q
+            else:
+                b[idx] = 0
+    return b
 
+# ---- Solve ----
+A = poisson_matrix(Nx, Ny, solid)
+b = rhs_vector(Nx, Ny, h, Q, solid)
+psi = scipy.sparse.linalg.spsolve(A, b)
+psi_grid = psi.reshape((Ny, Nx))  # [y, x] orientation
 
 ####### Plotting 
 # Grid coordinates

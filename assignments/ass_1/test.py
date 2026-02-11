@@ -2,46 +2,43 @@ import numpy as np
 import scipy.sparse 
 import matplotlib.pyplot as plt
 
-def poisson_matrix(Nx, Ny):
-    """
-    Creation of the poisson matrix...
 
-    """
-    Ntot = Nx*Ny
-    A = scipy.sparse.lil_matrix((Ntot,Ntot))
+def poisson_matrix(Nx, Ny):
+    Ntot = Nx * Ny
+    A = scipy.sparse.lil_matrix((Ntot, Ntot))
 
     for j in range(Ny):
         for i in range(Nx):
+            idx = i + j * Nx
+            is_boundary = False
 
-            idx = i + j*Nx
-
-            # Dirichlet boundaries at inlet 
-            if i==0:
+            if i == 0:  # inlet
                 A[idx, idx] = 1
-
-            # dirichlet at outlet
-            elif i==Nx-1 and j > 3:
+                is_boundary = True
+            elif i == Nx - 1 and j > 3:  # outlet
                 A[idx, idx] = 1
-
-            # Dirichlet boundaries at bttom 
-            elif j ==0 and i< 5:
+                is_boundary = True
+            elif j == 0 and i < 5:  # bottom wall
                 A[idx, idx] = 1
-
-            # dirichlet bc at top
-            elif j == Ny-1:
+                is_boundary = True
+            elif j == Ny - 1:  # top wall
                 A[idx, idx] = 1
-
-            # At the curb
-            elif i>=5 and j<=3:
+                is_boundary = True
+            elif i > 5 and j < 3:  # curb
                 A[idx, idx] = 1
+                is_boundary = True
 
-            else: 
+            if not is_boundary:  # interior
                 A[idx, idx] = -4
-                A[idx, idx+1] = 1
-                A[idx, idx -1] = 1
-                A[idx, idx + Nx] = 1
-                A[idx, idx -Nx] = 1
-    
+                if i > 0 and not (i-1 > 5 and j < 3):  # skip blocked neighbor
+                    A[idx, idx - 1] = 1
+                if i < Nx - 1 and not (i+1 > 5 and j < 3):  # skip blocked neighbor
+                    A[idx, idx + 1] = 1
+                if j > 0 and not (i > 5 and j-1 < 3):  # skip blocked neighbor
+                    A[idx, idx - Nx] = 1
+                if j < Ny - 1 and not (i > 5 and j+1 < 3):  # skip blocked neighbor
+                    A[idx, idx + Nx] = 1
+            
     return A.tocsr()
 
 def rhs_vector(Nx, Ny, h, Q):
@@ -73,8 +70,8 @@ def rhs_vector(Nx, Ny, h, Q):
                 b[idx] = Q*y/H
 
             # # curb
-            elif i>=5 and j<=3:
-                b[idx] = 2
+            elif i > 5 and j < 3:  # curb
+                b[idx] = 0
             
             # interior
             else:
@@ -95,12 +92,10 @@ A = poisson_matrix(Nx, Ny)
 b = rhs_vector(Nx, Ny, h, Q)
 
 # Solve
-psi = scipy.sparse.linalg.spsolve(A.tocsr(), b)
+psi = scipy.sparse.linalg.spsolve(A, b)
 psi_grid = psi.reshape((Ny, Nx))
 
 print(psi_grid)
-
-
 ####### Plotting 
 # Grid coordinates
 x = np.linspace(0, (Nx - 1) , Nx)
