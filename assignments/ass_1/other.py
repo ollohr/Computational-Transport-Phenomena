@@ -1,113 +1,107 @@
 import numpy as np
-import scipy.sparse
 import matplotlib.pyplot as plt
+import scipy
+import scipy.sparse
+import scipy.sparse.linalg
 
-# ---- Parameters ----
-Nx = 10
-Ny = 6
-h = 1.0
-Q = 5
+def is_solid(i, j, i_step=5, j_step=2):
+    # solid interior only (same as "better code")
+    return (i > i_step) and (j < j_step)
 
-# ---- Solid mask (curb) ----
-solid = np.zeros((Nx, Ny), dtype=bool)
-for i in range(Nx):
+def poisson(Nx: int, Ny: int, i_step=5, j_step=2) -> scipy.sparse.lil_matrix:
+    Ntot = Nx * Ny
+    A = scipy.sparse.lil_matrix((Ntot, Ntot))
+
     for j in range(Ny):
-        if i >= 5 and j <= 3:
-            solid[i,j] = True
+        for i in range(Nx):
+            idx = i + j * Nx
 
-# ---- Build Poisson matrix ----
-def poisson_matrix(Nx, Ny, solid):
-    Ntot = Nx*Ny
-    A = scipy.sparse.lil_matrix((Ntot,Ntot))
-    
-    for i in range(Nx):
-        for j in range(Ny):
-            idx = i + j*Nx
-            
-            # Solid
-            if solid[i,j]:
-                A[idx, idx] = 1
-                continue
-            
-            # Boundaries
-            if i == 0:           # inlet
-                A[idx, idx] = 1
-            elif i == Nx-1:      # outlet (Neumann will be applied later in b)
-                A[idx, idx] = 1
-            elif j == 0:         # bottom wall
-                A[idx, idx] = 1
-            elif j == Ny-1:      # top wall
-                A[idx, idx] = 1
-            else:                # interior
-                A[idx, idx] = -4
-                A[idx, idx+1] = 1
-                A[idx, idx-1] = 1
-                A[idx, idx+Nx] = 1
-                A[idx, idx-Nx] = 1
-    return A.tocsr()
+            inlet = (i == 0)
+            top   = (j == Ny - 1)
 
-# ---- RHS vector ----
-def rhs_vector(Nx, Ny, h, Q, solid):
-    Ntot = Nx*Ny
-    b = np.zeros(Ntot)
-    
-    for i in range(Nx):
-        for j in range(Ny):
-            idx = i + j*Nx
-            y = j*h
-            
-            if solid[i,j]:
-                b[idx] = 0
-            elif i == 0:           # inlet
-                b[idx] = Q * y / (h*(Ny-1))
-            elif i == Nx-1:        # outlet (Neumann)
-                b[idx] = 0
-            elif j == 0:           # bottom
-                b[idx] = 0
-            elif j == Ny-1:        # top
-                b[idx] = Q
+            bottom_upstream = (j == 0 and i <= i_step)
+            step_wall = (i == i_step and j <= j_step)
+            ledge = (j == j_step and i >= i_step)
+
+            outlet = (i == Nx - 1 and j >= j_step)
+
+            solid = is_solid(i, j, i_step, j_step)
+
+            # Dirichlet on boundaries + solid interior (kept in system but pinned)
+            if inlet or top or bottom_upstream or step_wall or ledge or outlet or solid:
+                A[idx, idx] = 1.0
             else:
-                b[idx] = 0
+                A[idx, idx] = -4.0
+                A[idx, idx + 1] = 1.0
+                A[idx, idx - 1] = 1.0
+                A[idx, idx + Nx] = 1.0
+                A[idx, idx - Nx] = 1.0
+
+    return A
+
+def rhs_vector(Nx: int, Ny: int, Q: float, i_step=5, j_step=2) -> np.ndarray:
+    Ntot = Nx * Ny
+    b = np.zeros(Ntot)
+
+    for j in range(Ny):
+        for i in range(Nx):
+            idx = i + j * Nx
+
+            inlet = (i == 0)
+            top   = (j == Ny - 1)
+
+            bottom_upstream = (j == 0 and i <= i_step)
+            step_wall = (i == i_step and j <= j_step)
+            ledge = (j == j_step and i >= i_step)
+
+            outlet = (i == Nx - 1 and j >= j_step)
+
+            solid = is_solid(i, j, i_step, j_step)
+
+            if bottom_upstream or step_wall or ledge or solid:
+                b[idx] = 0.0
+            elif top:
+                b[idx] = Q
+            elif inlet:
+                b[idx] = Q * j / (Ny - 1)
+            elif outlet:
+                b[idx] = Q * (j - j_step) / ((Ny - 1) - j_step)
+            else:
+                b[idx] = 0.0
+
     return b
 
-# ---- Solve ----
-A = poisson_matrix(Nx, Ny, solid)
-b = rhs_vector(Nx, Ny, h, Q, solid)
-psi = scipy.sparse.linalg.spsolve(A, b)
-psi_grid = psi.reshape((Ny, Nx))  # [y, x] orientation
+# Parameters
+Nx = 10
+Ny = 6
+Q = 5.0
+i_step = 5
+j_step = 2
 
-####### Plotting 
-# Grid coordinates
-x = np.linspace(0, (Nx - 1) , Nx)
-y = np.linspace(0, (Ny - 1) , Ny)  
-X, Y = np.meshgrid(x, y)  # 2D grid for plotting
+A = poisson(Nx, Ny, i_step, j_step)
+b = rhs_vector(Nx, Ny, Q, i_step, j_step)
 
-# Contour plot of the solution
+psi = scipy.sparse.linalg.spsolve(A.tocsr(), b)
+psi_grid = psi.reshape((Ny, Nx))
+
+# --- mask solid for plotting ONLY ---
+for j in range(Ny):
+    for i in range(Nx):
+        if is_solid(i, j, i_step, j_step):
+            psi_grid[j, i] = np.nan
+
+# Plot
+x = np.arange(Nx)
+y = np.arange(Ny)
+X, Y = np.meshgrid(x, y)
+
 plt.figure(figsize=(8, 5))
-cp = plt.contourf(X, Y, psi_grid, levels=50, cmap="viridis")
-plt.colorbar(cp)
-plt.title("Poisson Solution ψ(x, y)")
+levels = np.linspace(0, Q, 15)
+cs = plt.contour(X, Y, psi_grid, levels=levels)
+plt.clabel(cs, inline=True, fontsize=8, fmt="%.2f")
+plt.title("Streamlines (coarse grid)")
 plt.xlabel("x")
 plt.ylabel("y")
+plt.gca().set_aspect('equal', adjustable='box')
 plt.tight_layout()
-plt.show()
-
-# Plot profiles along x (rows) at different y positions
-plt.figure()
-for j in range(0, Ny, max(1, Ny // 5)):
-    plt.plot(x, psi_grid[j, :], label=f"y = {y[j]:.2f}")
-plt.xlabel("x")
-plt.ylabel("ψ")
-plt.title("Profiles at Different y Positions")
-plt.legend()
-plt.show()
-
-# Plot profiles along y (columns) at different x positions
-plt.figure()
-for i in range(0, Nx, max(1, Nx // 5)):
-    plt.plot(y, psi_grid[:, i], label=f"x = {x[i]:.2f}")
-plt.xlabel("y")
-plt.ylabel("ψ")
-plt.title("Profiles at Different x Positions")
-plt.legend()
 plt.show()
