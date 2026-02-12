@@ -156,13 +156,35 @@ plt.ylabel("y")
 plt.tight_layout()
 plt.show()
 
-# 2) Streamlines (psi = const)
-plt.figure(figsize=(8, 5))
-levels = np.linspace(0, Q, 15)
-cs = plt.contour(X, Y, psi_plot, levels=levels)
-plt.clabel(cs, inline=True, fontsize=8)
-plt.title("Streamlines (ψ = const)")
-plt.xlabel("x")
-plt.ylabel("y")
+# # 2) Streamlines (psi = const)
+# plt.figure(figsize=(8, 5))
+# # levels = np.linspace(0, Q, 6)
+# vals = psi_plot[~np.isnan(psi_plot)]
+# inner = np.quantile(vals, [0.25, 0.50, 0.75])   # 3 interior
+# levels = np.r_[0.0, inner, Q]                   # add boundaries
+# cs = plt.contour(X, Y, psi_plot, levels=levels)
+# plt.clabel(cs, inline=True, fontsize=8)
+# plt.title("Streamlines (ψ = const)")
+# plt.xlabel("x")
+# plt.ylabel("y")
+# plt.tight_layout()
+# plt.show()
+fig, ax = plt.subplots(figsize=(8, 5))
+
+# your levels (make sure Q is included if you want)
+vals = psi_plot[~np.isnan(psi_plot)]
+inner = np.quantile(vals, [0.25, 0.50, 0.75])
+levels = np.r_[0.0, inner, Q]
+
+cs = ax.contour(X, Y, psi_plot, levels=levels)
+ax.clabel(cs, inline=True, fontsize=8)
+
+# draw the top boundary streamline explicitly
+ax.hlines(y.max(), x.min(), x.max(), linewidth=2)
+ax.text(x.min()+0.1, y.max()-0.15, f"{Q:.2f}", fontsize=8)
+
+ax.set_title("Streamlines (ψ = const)")
+ax.set_xlabel("x")
+ax.set_ylabel("y")
 plt.tight_layout()
 plt.show()
