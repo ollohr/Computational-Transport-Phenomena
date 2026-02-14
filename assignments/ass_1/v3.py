@@ -24,7 +24,6 @@ def channel_solve(phi, n_streamlines, tol = 1e-10, maxit = 1000):
     psi[:j_y2, -1] = 0 #outlet for blocked step
     psi[j_y2:, -1] = phi * ((y[j_y2:]- 2)/3) #outlet for actual channel
 
-    #
     step = np.zeros((ny,nx), dtype=bool)
 
     #step
@@ -58,20 +57,14 @@ def channel_solve(phi, n_streamlines, tol = 1e-10, maxit = 1000):
             #wall at x=5 going up
             if j <= j_y2 and i == i_step5:
                 step[j, i] = True
-            
 
-
-    
     ###solve Laplace
-    #loop for max iterations
     for it in range(maxit):
         delta = 0
 
-        #loop for x and y values
         for j in range(1, ny-1):
             for i in range(1,nx -1):
                 
-                #check whether the point is either the step or a boundary/fixed poitn
                 if step[j, i]:
                     continue
 
@@ -110,44 +103,50 @@ def channel_solve(phi, n_streamlines, tol = 1e-10, maxit = 1000):
         if delta < tol:
             break
 
-    ###plotting graphsss
+    ###plotting
     X, Y = np.meshgrid(x,y)
-
     psi_plot = psi.copy()
 
     #heatmap
     plt.figure(figsize=(10,5))
     plt.contourf(X, Y, psi_plot, levels = 50)
     plt.colorbar(label = 'Streamline')
-    plt.plot([0,5,5,9], [0,0,2,2]) #plotting bottom streamline along wall
-    plt.plot([0,9], [5,5]) #plotting top wall streamline
+    plt.plot([0,5,5,9], [0,0,2,2])
+    plt.plot([0,9], [5,5])
     plt.xlim(0,9)
     plt.ylim(-0.1,5.1)
     plt.xlabel('x [m]')
     plt.ylabel('y [m]')
 
-    step_patch = Polygon([(5,0), (9,0), (9,2), (5,2)],closed=True,facecolor='white',edgecolor='white',linewidth=2)
-
+    step_patch = Polygon([(5,0), (9,0), (9,2), (5,2)],
+                         closed=True, facecolor='white', edgecolor='white', linewidth=2)
     plt.gca().add_patch(step_patch)
     plt.show()
 
-    psi_plot[(X >= x[i_step5]) & (Y < y[j_y2])] = np.nan
-    #streamines
-    streamlines_list = np.linspace(0, phi, n_streamlines)
+    # =======================
+    # CHANGE #1: mask the step region instead of using NaN
+    mask = (X >= x[i_step5]) & (Y < y[j_y2])
+    psi_masked = np.ma.array(psi_plot, mask=mask)
 
+    # CHANGE #2: exclude wall levels 0 and phi (more robust near boundaries)
+    levels = np.linspace(0, phi, n_streamlines + 2)[1:-1]
+    # =======================
+
+    #streamlines
     plt.figure(figsize=(10,5))
-    psi_on_line = plt.contour(X, Y, psi_plot, levels=streamlines_list)
-    plt.clabel(psi_on_line, inline = True)
 
-    plt.plot([0,5,5,9], [0,0,2,2]) #plotting bottom streamline along wall
-    plt.plot([0,9], [5,5]) #plotting top wall streamline
+    # CHANGE #3: corner_mask=False avoids dropped segments near masked corners
+    psi_on_line = plt.contour(X, Y, psi_masked, levels=levels, corner_mask=False)
+    plt.clabel(psi_on_line, inline=True)
+
+    plt.plot([0,5,5,9], [0,0,2,2])
+    plt.plot([0,9], [5,5])
 
     plt.xlim(0,9)
     plt.ylim(-0.1,5.1)
     plt.xlabel('x [m]')
     plt.ylabel('y [m]')
     plt.show()
-
 
     return psi
 
