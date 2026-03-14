@@ -1,0 +1,28 @@
+\subsection{Governing Equations}
+Because the flow is low-speed and incompressible, Fluent's \textit{pressure-based} solver is used, which enforces mass conservation through the continuity equation and solves the momentum equations for the velocity field.
+
+\paragraph{General (3D, unsteady) incompressible Navier--Stokes equations.}
+For a Newtonian fluid with constant $\rho$ and $\mu$:
+\begin{align}
+    \nabla \cdot \mathbf{u} &= 0, \label{eq:cont_general}\\
+    \rho\left(\frac{\partial \mathbf{u}}{\partial t} + (\mathbf{u}\cdot\nabla)\mathbf{u}\right) &= -\nabla p + \mu \nabla^2 \mathbf{u}. \label{eq:ns_general}
+\end{align}
+
+\paragraph{Steady, 2D ($x$-$y$) form used in this tutorial.}
+Under the assumptions of steady flow ($\partial/\partial t=0$) and two-dimensionality ($\mathbf{u}=(u,v)$), the equations reduce to:
+
+\begin{align}
+    \text{Continuity:}\qquad 
+    \frac{\partial u}{\partial x} + \frac{\partial v}{\partial y} &= 0, 
+    \label{eq:cont_2d}\\[6pt]
+    \text{$x$-momentum:}\qquad
+    \rho\left(u\frac{\partial u}{\partial x} + v\frac{\partial u}{\partial y}\right) &=
+    -\frac{\partial p}{\partial x}
+    + \mu\left(\frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2}\right),
+    \label{eq:xmom_2d}\\[6pt]
+    \text{$y$-momentum:}\qquad
+    \rho\left(u\frac{\partial v}{\partial x} + v\frac{\partial v}{\partial y}\right) &=
+    -\frac{\partial p}{\partial y}
+    + \mu\left(\frac{\partial^2 v}{\partial x^2} + \frac{\partial^2 v}{\partial y^2}\right).
+    \label{eq:ymom_2d}
+    \end{align}

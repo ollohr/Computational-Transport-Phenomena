@@ -1,0 +1,3 @@
+
+name	report-definition	force-vector	reference-frame	old-props	thread-ids	thread-names	location-ids	locations	per-zone?	average-over	report-type	scaled?	retain-instantaneous-values?
+plot_drag-1	drag	(1. 0. 1.)	"global"	(force-vector (1. 0. 1.) reference-frame "global" per-zone? #f average-over 1 thread-ids (8) thread-names (cylinder) header "" scaled? #t name "plot_drag-1" type "drag" retain-instantaneous-values? #f)	(8)	(cylinder)	()	((physics) (geometry) (surfaces))	#f	1	""	#t	#f
